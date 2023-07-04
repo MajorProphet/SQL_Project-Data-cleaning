@@ -1,0 +1,131 @@
+--This query will select the entire data from the table
+SELECT *
+FROM dbo.Sheet1$
+
+
+--This is how to simply add a new column to a table, specifying its data type
+
+ALTER TABLE dbo.Sheet1$
+ADD Sales_Date_Converted1 Date
+
+--This is the final step in adding a new column to a table, you update the existing table with the new column
+
+UPDATE dbo.Sheet1$
+SET Sales_Date_Converted1=CONVERT(date,SaleDate)
+
+--For the most part, joining the same table to itself and accounting for the fact that 
+--the unique ids are not the same helps in dealing with duplicated or null values
+
+SELECT fem.ParcelID,fem.PropertyAddress,dem.ParcelID,dem.PropertyAddress
+FROM dbo.Sheet1$ fem
+JOIN dbo.Sheet1$ dem
+ON fem.ParcelID=dem.ParcelID
+AND fem.[UniqueID ]<>dem.[UniqueID ]
+WHERE fem.PropertyAddress IS NULL
+
+
+UPDATE fem
+SET PropertyAddress=ISNULL(fem.PropertyAddress,dem.PropertyAddress)
+FROM dbo.Sheet1$ fem
+JOIN dbo.Sheet1$ dem
+ON fem.ParcelID=dem.ParcelID
+AND fem.[UniqueID ]<>dem.[UniqueID ]
+WHERE fem.PropertyAddress IS NULL
+
+--Using a substring function as a delimeter in order to separate your desired string from a comma or symbol
+
+SELECT SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) AS Proper_Address
+FROM dbo.Sheet1$
+
+--This query not only separates the two strigs but also puts them into columns, side by side
+
+SELECT SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) AS Proper_Address,
+SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress)) AS State
+FROM dbo.Sheet1$
+
+ALTER TABLE dbo.Sheet1$
+ADD Proper_Address3 varchar(100),
+State varchar(100)
+
+UPDATE dbo.Sheet1$
+SET Proper_Address3=SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1),
+State=SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress))
+
+--Create a view to store this query for future use, I call it BigBoy!!!
+
+CREATE VIEW BigBoy AS
+SELECT SUBSTRING(PropertyAddress,1,CHARINDEX(',',PropertyAddress)-1) AS Proper_Address,
+SUBSTRING(PropertyAddress,CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress)) AS State
+FROM dbo.Sheet1$
+
+SELECT*
+FROM dbo.BigBoy
+
+SELECT *
+FROM ..Sheet1$
+
+--This method is an alternative for the previuos methods highlighted above
+
+SELECT PARSENAME(REPLACE(OwnerName,'&','-'),1) AS Own1,PARSENAME(REPLACE(OwnerName,'&','-'),2)AS Own2,
+PARSENAME(REPLACE(OwnerName,'&','-'),3)AS Own3
+FROM Sheet1$
+
+ALTER TABLE Sheet1$
+ADD Own1 varchar(100)
+
+UPDATE Sheet1$
+SET Own1=PARSENAME(REPLACE(OwnerName,'&','-'),1)
+
+ALTER TABLE Sheet1$
+ADD Own2 varchar(100)
+
+UPDATE Sheet1$
+SET Own2=PARSENAME(REPLACE(OwnerName,'&','-'),2)
+
+ALTER TABLE Sheet1$
+ADD Own3 varchar(100)
+
+UPDATE Sheet1$
+SET Own3=PARSENAME(REPLACE(OwnerName,'&','-'),3)
+
+--Data Cleaning in SQL
+
+SELECT COUNT(Proper_Address3)-COUNT(DISTINCT(Proper_Address3)) AS DifferenceInCoount
+FROM Sheet1$
+
+--Updating the column directly without necesserily creating a new column
+
+UPDATE Sheet1$
+SET SoldAsVacaNoot=CASE
+WHEN SoldAsVacaNoot='No' THEN REPLACE(SoldAsVacaNoot,'No','NO Oh!')
+WHEN SoldAsVacaNoot='Yes' THEN REPLACE(SoldAsVacaNoot,'Yes','YES Oh!')
+ELSE SoldAsVacaNoot
+END
+
+--This CTE will is used for removing duplicates from the table
+
+
+WITH RightTable
+AS
+(
+SELECT*, ROW_NUMBER()OVER
+(PARTITION BY ParcelID,
+LandUse,OwnerName,OwnerAddress,BuildingValue ORDER BY ParcelID) AS rowTime
+FROM Sheet1$
+)
+
+DELETE
+FROM RightTable
+WHERE rowTime>1
+
+--This creates a view which isn't a real table but can be used to extract data, especially for visualization purposes
+
+CREATE VIEW RightTable 
+AS
+SELECT ParcelID,
+LandUse,OwnerName,OwnerAddress,BuildingValue
+FROM Sheet1$
+
+--This deletes specific columns from a table
+ALTER TABLE Sheet1$
+DROP COLUMN Own1,Own2,Own3
